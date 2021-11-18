@@ -2,7 +2,6 @@ import time
 
 from noxLogger import noxLogger
 
-
 # I am an alarm item.
 class AlarmItem:
     # I am the ID of the alarm for Identification.

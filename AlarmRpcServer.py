@@ -35,9 +35,10 @@ class AlarmRpcServer:
     def getCounter(self):
         try:
             ret = self.AlarmService.getCounter()
+            noxLogger.debug("AlarmRpcServer - getCounter: Returning " + str(ret))
             return ret
-        except Exception as e:
-            noxLogger.error("AlarmRpcServer - count: Unable obtain counter")
+        except Exception:
+            noxLogger.error("AlarmRpcServer - count: Unable obtain counter.")
 
     # Returns the counter
     def count(self):
@@ -47,11 +48,17 @@ class AlarmRpcServer:
     def list(self):
         try:
             ret = self.AlarmService.getList()
+            noxLogger.debug("AlarmRpcServer - list: Successfully returned the list of alarms.")
             return ret
         except Exception as e:
-            noxLogger.error("AlarmRpcServer - list: Unable to read alarms")
+            noxLogger.error("AlarmRpcServer - list: Unable to read alarms.")
 
     # Acknlowedges the given alarm.
     def acknowledge(self, alarm):
-        self.AlarmService.acknowledge(alarm)
-        return True
+        try:
+            self.AlarmService.acknowledge(alarm)
+            noxLogger.debug("acknowledge - list: Successfully acknowledged alarm " + alarm)
+            return True
+        except Exception as e:
+            noxLogger.error("acknowledge - list: Failed to acknowledge alarm " + alarm)
+            return False
