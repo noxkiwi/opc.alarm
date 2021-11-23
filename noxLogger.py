@@ -1,4 +1,5 @@
 from ConfigManager import ConfigManager
+import time
 
 configManager = ConfigManager()
 
@@ -16,8 +17,9 @@ class noxLogger:
     # I will write the given text into stdout.
     def write(text):
         with open(configManager.get("logging>LogFile"), "a") as logFile:
-            print(text)
-            logFile.write(text + "\n")
+            timestamp = time.strftime('%Y-%m-%d %H:%m:%S %z')
+            prefix    = configManager.get("logging>Prefix")
+            logFile.write(timestamp + prefix + text + "\n")
 
     # I will decide whether to log the given text or not based on the given level.
     def writeLog(text, level):
