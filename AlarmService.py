@@ -63,33 +63,35 @@ SELECT
 	`alarm_item_name`,
 	`readItem`.`opc_item_address` AS `readAddress`,
 	`alarmItem`.`opc_item_address` AS `writeAddress`,
-	`cameItem`.`opc_item_address` AS `cameAddress`,
-	`goneItem`.`opc_item_address` AS `goneAddress`,
+	`engagedItem`.`opc_item_address` AS `engagedAddress`,
+	`disengagedItem`.`opc_item_address` AS `disengagedAddress`,
 	`ackItem`.`opc_item_address` AS `ackAddress`,
 	`alarm_item`.`alarm_item_hysteresis_seconds`,
 	`alarm_item`.`alarm_item_hysteresis_value`,
 	`alarm_item`.`alarm_item_comparison_type`,
 	`alarm_item`.`alarm_item_compare_value`,
 	`alarm_item`.`alarm_item_valence_on`,
-	`alarm_item`.`alarm_item_valence_off`
+	`alarm_item`.`alarm_item_valence_off`,
+	`alarm_item`.`alarm_item_last_engaged`,
+	`alarm_item`.`alarm_item_last_disengaged`,
+	`alarm_item`.`alarm_item_last_ack`
 FROM	`alarm_item`
 JOIN	`opc_item`	AS	`readItem`	ON(`readItem`.`opc_item_id` = `alarm_item`.`opc_item_id_read`)
 JOIN	`opc_item`	AS	`alarmItem`	ON(`alarmItem`.`opc_item_id` = `alarm_item`.`opc_item_id_alarm`)
-JOIN	`opc_item`	AS	`cameItem`	ON(`cameItem`.`opc_item_id` = `alarm_item`.`opc_item_id_came`)
-JOIN	`opc_item`	AS	`goneItem`	ON(`goneItem`.`opc_item_id` = `alarm_item`.`opc_item_id_gone`)
+JOIN	`opc_item`	AS	`engagedItem`	ON(`engagedItem`.`opc_item_id` = `alarm_item`.`opc_item_id_engaged`)
+JOIN	`opc_item`	AS	`disengagedItem`	ON(`disengagedItem`.`opc_item_id` = `alarm_item`.`opc_item_id_disengaged`)
 JOIN	`opc_item`	AS	`ackItem`	ON(`ackItem`.`opc_item_id` = `alarm_item`.`opc_item_id_ack`)
 WHERE TRUE
 	AND	`readItem`.`opc_item_flags`		&1=1
 	AND	`alarmItem`.`opc_item_flags`	&1=1
-	AND	`cameItem`.`opc_item_flags`		&1=1
-	AND	`goneItem`.`opc_item_flags`		&1=1
+	AND	`engagedItem`.`opc_item_flags`		&1=1
+	AND	`disengagedItem`.`opc_item_flags`		&1=1
 	AND	`ackItem`.`opc_item_flags`		&1=1
 	AND	`alarm_item`.`alarm_item_flags`	&1=1
 	AND	`alarm_item`.alarm_group_id =  """ + str(alarmGroupItem.alarm_group_id)
-            queryData     = (1,2,3)
+            queryData = (1, 2, 3)
             alarmItemRows = dm.read(queryString, queryData)
 
-	
             for alarmItemRow in alarmItemRows:
                 alarmItem = AlarmItem(alarmItemRow, self, alarmGroupItem)
                 self.connect(alarmItem)
@@ -131,12 +133,15 @@ WHERE TRUE
     def stop(self):
         self.server.stop()
 
-    def connect(self, alarmItem):
+    def connect(self, alarmItem: AlarmItem):
         self.connectRead(alarmItem)
         self.connectWrite(alarmItem)
-        self.connectCame(alarmItem)
-        self.connectGone(alarmItem)
+        self.connectEngaged(alarmItem)
+        self.connectDisengaged(alarmItem)
         self.connectAck(alarmItem)
+        if not alarmItem.alarm_last_engaged is None:
+            print(alarmItem.alarm_last_engaged)
+            alarmItem.engage(alarmItem.alarm_last_engaged)
 
     def MakeNodePath(self, address):
         branches = address.split(".")
@@ -147,29 +152,30 @@ WHERE TRUE
         return ret
 
     def connectRead(self, alarmItem):
-        alarmItem.node_read = alarmItem.alarmGroupItem.baseClient.get_root_node().get_child(self.MakeNodePath(alarmItem.alarm_address_read))
+        alarmItem.node_read = alarmItem.alarmGroupItem.baseClient.get_root_node().get_child(
+            self.MakeNodePath(alarmItem.alarm_address_read))
 
     def connectWrite(self, alarmItem):
         alarmItem.node_write = self.connectAddress(alarmItem.alarm_address_write)
         alarmItem.node_write.set_value(alarmItem.alarm_item_valence_off)
 
-    def connectCame(self, alarmItem):
-        if alarmItem.alarm_address_came is None:
+    def connectEngaged(self, alarmItem):
+        if alarmItem.alarm_address_engaged is None:
             return
-        alarmItem.node_came = self.connectAddress(alarmItem.alarm_address_came)
-        alarmItem.node_came.set_value("")
+        alarmItem.node_engaged = self.connectAddress(alarmItem.alarm_address_engaged)
+        alarmItem.node_engaged.set_value(alarmItem.alarm_last_engaged or "")
 
-    def connectGone(self, alarmItem):
-        if alarmItem.alarm_address_gone is None:
+    def connectDisengaged(self, alarmItem):
+        if alarmItem.alarm_address_disengaged is None:
             return
-        alarmItem.node_gone = self.connectAddress(alarmItem.alarm_address_gone)
-        alarmItem.node_gone.set_value("")
+        alarmItem.node_disengaged = self.connectAddress(alarmItem.alarm_address_disengaged)
+        alarmItem.node_disengaged.set_value(alarmItem.alarm_last_disengaged or "")
 
     def connectAck(self, alarmItem):
         if alarmItem.alarm_address_ack is None:
             return
         alarmItem.node_ack = self.connectAddress(alarmItem.alarm_address_ack)
-        alarmItem.node_ack.set_value("")
+        alarmItem.node_ack.set_value(alarmItem.alarm_last_ack or "")
 
     # Generate Tree Branches and the end node.
     def MakeNode(self, tree):
